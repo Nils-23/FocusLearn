@@ -1,65 +1,162 @@
-import Image from "next/image";
+"use client";
+import { useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
+import confetti from "canvas-confetti";
 
-export default function Home() {
+type Task = {
+  id: number;
+  title: string;
+  dueDate?: string;
+  completed: boolean;
+};
+
+export default function HomePage() {
+  const [pomodoroSessions, setPomodoroSessions] = useState(0);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [progress, setProgress] = useState(0);
+
+  // ✅ Load saved sessions and tasks when the page loads
+  useEffect(() => {
+    const storedSessions = localStorage.getItem("pomodoroSessions");
+    if (storedSessions) setPomodoroSessions(parseInt(storedSessions));
+
+    const storedTasks = localStorage.getItem("tasks");
+    if (storedTasks) setTasks(JSON.parse(storedTasks));
+  }, []);
+
+  // ✅ Compute progress when tasks change
+  useEffect(() => {
+    if (tasks.length > 0) {
+      const completed = tasks.filter((t) => t.completed).length;
+      setProgress(Math.round((completed / tasks.length) * 100));
+    } else {
+      setProgress(0);
+    }
+  }, [tasks]);
+
+  // ✅ Mark a task as done
+  const toggleTaskDone = (id: number) => {
+    const updated = tasks.map((t) =>
+      t.id === id ? { ...t, completed: !t.completed } : t
+    );
+    setTasks(updated);
+    localStorage.setItem("tasks", JSON.stringify(updated));
+    const now = updated.find((t) => t.id === id);
+    if (now && now.completed) {
+      toast.success("Nice work! Task completed 🎉");
+      confetti({ particleCount: 90, spread: 70, origin: { y: 0.7 } });
+    }
+  };
+
+  const dueTasks = tasks.filter(
+    (t) => t.dueDate && !t.completed && new Date(t.dueDate) < new Date()
+  );
+
+  const ring = useMemo(() => {
+    const size = 120;
+    const stroke = 10;
+    const radius = (size - stroke) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const dashOffset = circumference - (progress / 100) * circumference;
+    return { size, stroke, radius, circumference, dashOffset };
+  }, [progress]);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="p-6 md:p-10 min-h-screen">
+      <div className="max-w-5xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-slate-600 text-sm md:text-base">Small steps, big progress ✨</p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Stat cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
+          <div className="bg-white rounded-2xl shadow-md p-5 md:p-6 hover:shadow-lg transition-all">
+            <p className="text-slate-500">Total Tasks</p>
+            <p className="text-4xl font-semibold mt-2">{tasks.length}</p>
+          </div>
+          <div className="bg-[#FFF7ED] rounded-2xl shadow-md p-5 md:p-6 hover:shadow-lg transition-all">
+            <p className="text-slate-600">Due Tasks</p>
+            <p className="text-4xl font-semibold mt-2 text-[#F97316]">{dueTasks.length}</p>
+          </div>
+          <div className="bg-[#E0E7FF] rounded-2xl shadow-md p-5 md:p-6 hover:shadow-lg transition-all flex items-center gap-5">
+            <svg width={ring.size} height={ring.size} className="shrink-0">
+              <circle
+                cx={ring.size / 2}
+                cy={ring.size / 2}
+                r={ring.radius}
+                stroke="#CBD5E1"
+                strokeWidth={ring.stroke}
+                fill="transparent"
+              />
+              <circle
+                cx={ring.size / 2}
+                cy={ring.size / 2}
+                r={ring.radius}
+                stroke="#22C55E"
+                strokeWidth={ring.stroke}
+                fill="transparent"
+                strokeDasharray={ring.circumference}
+                strokeDashoffset={ring.dashOffset}
+                strokeLinecap="round"
+                style={{ transition: "stroke-dashoffset 600ms ease" }}
+              />
+              <text
+                x="50%"
+                y="50%"
+                dominantBaseline="middle"
+                textAnchor="middle"
+                className="fill-slate-700 text-xl font-semibold"
+              >
+                {progress}%
+              </text>
+            </svg>
+            <div>
+              <p className="text-slate-600">Progress</p>
+              <p className="text-sm text-slate-500 leading-relaxed">Keep going — you’re doing great!</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl shadow-md p-5 md:p-6 hover:shadow-lg transition-all">
+            <p className="text-slate-500">Pomodoro Today</p>
+            <p className="text-4xl font-semibold mt-2 text-[#4F46E5]">{pomodoroSessions}</p>
+          </div>
         </div>
-      </main>
+
+        {/* Recent Tasks */}
+        <div className="bg-white rounded-2xl shadow-md p-5 md:p-6">
+          <h2 className="text-2xl font-semibold mb-4">Recent Tasks</h2>
+          {tasks.length === 0 ? (
+            <p className="text-slate-500">No tasks yet. Add one from the "+" tab.</p>
+          ) : (
+            <ul className="space-y-3">
+              {tasks.slice(0, 5).map((task) => (
+                <li
+                  key={task.id}
+                  className={`flex justify-between items-center border-b last:border-b-0 pb-3 ${
+                    task.completed ? "opacity-60 line-through" : ""
+                  }`}
+                >
+                  <span className="text-lg">{task.title}</span>
+                  <button
+                    onClick={() => toggleTaskDone(task.id)}
+                    className={`text-sm px-3 py-1 rounded-lg transition-all shadow-sm ${
+                      task.completed
+                        ? "bg-slate-300 text-white"
+                        : "bg-[#22C55E] text-white hover:brightness-110"
+                    }`}
+                  >
+                    {task.completed ? "Undo" : "Done"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {tasks.length > 5 && (
+            <p className="text-[#4F46E5] mt-4 text-sm">View more in the Tasks tab →</p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
