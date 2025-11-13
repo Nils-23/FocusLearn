@@ -1,7 +1,7 @@
 // src/components/TaskList.tsx
 "use client";
 import { useEffect, useState } from "react";
-import type { Task } from "../lib/types";
+import type { Task } from "../../lib/types";
 
 export default function TaskList() {
   const [tasks, setTasks] = useState<Task[]>([]);

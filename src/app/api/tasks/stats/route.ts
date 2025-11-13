@@ -1,6 +1,6 @@
 // src/app/api/tasks/stats/route.ts
 import { NextResponse } from "next/server";
-import { tasks } from "../../../lib/data";
+import { tasks } from "../../../../lib/data";
 
 export async function GET() {
   const total = tasks.length;

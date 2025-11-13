@@ -1,7 +1,7 @@
 // src/app/api/tasks/route.ts
 import { NextResponse } from "next/server";
-import type { Task } from "../../lib/types";
-import { tasks } from "../../lib/data";
+import type { Task } from "../../../lib/types";
+import { tasks } from "../../../lib/data";
 import { v4 as uuidv4 } from "uuid";
 
 export async function GET() {
