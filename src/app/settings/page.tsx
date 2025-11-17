@@ -1,12 +1,12 @@
 "use client";
 import { useState, useEffect } from "react";
 import { auth } from "@/lib/firebaseConfig";
-import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
+import toast from "react-hot-toast";
 
 export default function SettingsPage() {
   const [darkMode, setDarkMode] = useState(false);
-  const [focusMode, setFocusMode] = useState(false);
   const [fullName, setFullName] = useState("");
   const [age, setAge] = useState("");
   const [major, setMajor] = useState("");
@@ -15,16 +15,14 @@ export default function SettingsPage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [focusMode, setFocusMode] = useState(false);
 
   const db = getFirestore();
 
-  // Load dark mode, focus mode and profile
+  // Load Dark Mode, user profile, and focus mode
   useEffect(() => {
-    const storedDark = localStorage.getItem("darkMode");
-    if (storedDark === "true") setDarkMode(true);
-
-    const savedFocus = localStorage.getItem("focusMode");
-    if (savedFocus === "true") setFocusMode(true);
+    const stored = localStorage.getItem("darkMode");
+    if (stored === "true") setDarkMode(true);
 
     const loadUserProfile = async () => {
       const user = auth.currentUser;
@@ -39,13 +37,21 @@ export default function SettingsPage() {
           setPrimaryGoal(data.primaryGoal || "");
           setDailyGoal(data.dailyGoal || "");
         }
+
+        // Load focus mode from Timer doc
+        const timerRef = doc(db, "timer", user.uid);
+        const timerSnap = await getDoc(timerRef);
+        if (timerSnap.exists()) {
+          const timerData = timerSnap.data();
+          setFocusMode(timerData.focusMode || false);
+        }
       }
     };
 
     loadUserProfile();
   }, []);
 
-  // Apply dark mode class and store
+  // Apply dark mode class
   useEffect(() => {
     const html = document.documentElement;
     if (darkMode) html.classList.add("dark");
@@ -54,30 +60,22 @@ export default function SettingsPage() {
     localStorage.setItem("darkMode", darkMode.toString());
   }, [darkMode]);
 
-  // Store focus/lockdown mode & trigger callback
-  useEffect(() => {
-    localStorage.setItem("focusMode", focusMode.toString());
-
-    if (focusMode) {
-      console.log("🔒 Focus Mode ON — notifications should be blocked.");
-      // A real notification-blocking call will go here later
-    } else {
-      console.log("🔓 Focus Mode OFF — notifications allowed.");
-    }
-  }, [focusMode]);
-
+  // Save profile updates
   const saveProfile = async () => {
     const user = auth.currentUser;
     if (user) {
-      await setDoc(
-        doc(db, "users", user.uid),
-        { fullName, age, major, primaryGoal, dailyGoal },
-        { merge: true }
-      );
-      setMessage("Profile updated successfully!");
+      await setDoc(doc(db, "users", user.uid), {
+        fullName,
+        age,
+        major,
+        primaryGoal,
+        dailyGoal,
+      }, { merge: true });
+      toast.success("Profile updated successfully!");
     }
   };
 
+  // Change password
   const changePassword = async () => {
     const user = auth.currentUser;
     if (!user || !user.email) return;
@@ -85,10 +83,25 @@ export default function SettingsPage() {
       const cred = EmailAuthProvider.credential(user.email, currentPassword);
       await reauthenticateWithCredential(user, cred);
       await updatePassword(user, newPassword);
-      setMessage("Password updated successfully!");
+      toast.success("Password updated successfully!");
     } catch (err: any) {
-      setMessage("Error updating password: " + err.message);
+      toast.error("Error updating password: " + err.message);
     }
+  };
+
+  // Toggle Focus Mode
+  const toggleFocusMode = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const newFocus = !focusMode;
+    setFocusMode(newFocus);
+
+    // Update Firestore Timer doc
+    const timerRef = doc(db, "timer", user.uid);
+    await updateDoc(timerRef, { focusMode: newFocus });
+
+    toast.success(`Focus Mode ${newFocus ? "Enabled 🔒" : "Disabled 🔓"}`);
   };
 
   return (
@@ -100,24 +113,9 @@ export default function SettingsPage() {
         <span className="text-lg">Dark Mode</span>
         <button
           onClick={() => setDarkMode(!darkMode)}
-          className={`px-4 py-2 rounded ${
-            darkMode ? "bg-gray-700 text-white" : "bg-gray-300 text-black"
-          }`}
+          className={`px-4 py-2 rounded ${darkMode ? "bg-gray-700 text-white" : "bg-gray-300 text-black"}`}
         >
           {darkMode ? "On" : "Off"}
-        </button>
-      </div>
-
-      {/* Focus / Lockdown Mode */}
-      <div className="flex items-center justify-between mb-6">
-        <span className="text-lg">Focus Mode (Lock Notifications)</span>
-        <button
-          onClick={() => setFocusMode(!focusMode)}
-          className={`px-4 py-2 rounded ${
-            focusMode ? "bg-green-700 text-white" : "bg-gray-300 text-black"
-          }`}
-        >
-          {focusMode ? "Enabled" : "Disabled"}
         </button>
       </div>
 
@@ -140,13 +138,22 @@ export default function SettingsPage() {
         <button onClick={changePassword} className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700">Change Password</button>
       </div>
 
+      {/* Focus Mode */}
+      <div className="mb-6 flex items-center justify-between">
+        <span className="text-lg font-medium">Focus Mode</span>
+        <button
+          onClick={toggleFocusMode}
+          className={`px-4 py-2 rounded ${focusMode ? "bg-green-600 text-white" : "bg-gray-300 text-black"}`}
+        >
+          {focusMode ? "Enabled 🔒" : "Disabled 🔓"}
+        </button>
+      </div>
+
       {/* About */}
       <div className="mb-6">
         <h2 className="text-xl font-semibold">About</h2>
         <p className="text-gray-700 dark:text-gray-300">ADHD Companion helps students manage tasks, stay focused, and track their progress efficiently. Version 1.0</p>
       </div>
-
-      {message && <div className="text-green-600 mt-4">{message}</div>}
     </div>
   );
 }
