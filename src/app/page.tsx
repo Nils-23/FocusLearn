@@ -2,29 +2,42 @@
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import confetti from "canvas-confetti";
-
-type Task = {
-  id: number;
-  title: string;
-  dueDate?: string;
-  completed: boolean;
-};
+import { watchAuthState } from "@/lib/auth";
+import { getUserPomodoro } from "@/lib/pomodoro";
+import { getUserTasks, toggleTaskCompleted } from "@/lib/tasks";
 
 export default function HomePage() {
+  const [user, setUser] = useState<any>(null);
   const [pomodoroSessions, setPomodoroSessions] = useState(0);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
   const [progress, setProgress] = useState(0);
 
-  // ✅ Load saved sessions and tasks when the page loads
+  // Watch auth state
   useEffect(() => {
-    const storedSessions = localStorage.getItem("pomodoroSessions");
-    if (storedSessions) setPomodoroSessions(parseInt(storedSessions));
-
-    const storedTasks = localStorage.getItem("tasks");
-    if (storedTasks) setTasks(JSON.parse(storedTasks));
+    const unsub = watchAuthState(async (u) => {
+      setUser(u);
+    });
+    return () => unsub();
   }, []);
 
-  // ✅ Compute progress when tasks change
+  // Load user-specific data from Firestore
+  useEffect(() => {
+    if (!user) return;
+
+    async function loadData() {
+      const [sessions, userTasks] = await Promise.all([
+        getUserPomodoro(user.uid),
+        getUserTasks(user.uid),
+      ]);
+
+      setPomodoroSessions(sessions);
+      setTasks(userTasks);
+    }
+
+    loadData();
+  }, [user]);
+
+  // Compute progress
   useEffect(() => {
     if (tasks.length > 0) {
       const completed = tasks.filter((t) => t.completed).length;
@@ -34,15 +47,16 @@ export default function HomePage() {
     }
   }, [tasks]);
 
-  // ✅ Mark a task as done
-  const toggleTaskDone = (id: number) => {
+  // Mark a task as done in Firestore
+  const toggleTaskDone = async (task: any) => {
+    await toggleTaskCompleted(task.id, !task.completed);
+
     const updated = tasks.map((t) =>
-      t.id === id ? { ...t, completed: !t.completed } : t
+      t.id === task.id ? { ...t, completed: !t.completed } : t
     );
     setTasks(updated);
-    localStorage.setItem("tasks", JSON.stringify(updated));
-    const now = updated.find((t) => t.id === id);
-    if (now && now.completed) {
+
+    if (!task.completed) {
       toast.success("Nice work! Task completed 🎉");
       confetti({ particleCount: 90, spread: 70, origin: { y: 0.7 } });
     }
@@ -52,6 +66,7 @@ export default function HomePage() {
     (t) => t.dueDate && !t.completed && new Date(t.dueDate) < new Date()
   );
 
+  // Progress ring math
   const ring = useMemo(() => {
     const size = 120;
     const stroke = 10;
@@ -61,12 +76,18 @@ export default function HomePage() {
     return { size, stroke, radius, circumference, dashOffset };
   }, [progress]);
 
+  if (!user) return <div className="p-6">Loading...</div>;
+
   return (
     <div className="p-6 md:p-10 min-h-screen">
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-slate-600 text-sm md:text-base">Small steps, big progress ✨</p>
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+            Dashboard
+          </h1>
+          <p className="text-slate-600 text-sm md:text-base">
+            Small steps, big progress ✨
+          </p>
         </div>
 
         {/* Stat cards */}
@@ -75,10 +96,14 @@ export default function HomePage() {
             <p className="text-slate-500">Total Tasks</p>
             <p className="text-4xl font-semibold mt-2">{tasks.length}</p>
           </div>
+
           <div className="bg-[#FFF7ED] rounded-2xl shadow-md p-5 md:p-6 hover:shadow-lg transition-all">
             <p className="text-slate-600">Due Tasks</p>
-            <p className="text-4xl font-semibold mt-2 text-[#F97316]">{dueTasks.length}</p>
+            <p className="text-4xl font-semibold mt-2 text-[#F97316]">
+              {dueTasks.length}
+            </p>
           </div>
+
           <div className="bg-[#E0E7FF] rounded-2xl shadow-md p-5 md:p-6 hover:shadow-lg transition-all flex items-center gap-5">
             <svg width={ring.size} height={ring.size} className="shrink-0">
               <circle
@@ -113,20 +138,27 @@ export default function HomePage() {
             </svg>
             <div>
               <p className="text-slate-600">Progress</p>
-              <p className="text-sm text-slate-500 leading-relaxed">Keep going — you’re doing great!</p>
+              <p className="text-sm text-slate-500 leading-relaxed">
+                Keep going — you’re doing great!
+              </p>
             </div>
           </div>
+
           <div className="bg-white rounded-2xl shadow-md p-5 md:p-6 hover:shadow-lg transition-all">
             <p className="text-slate-500">Pomodoro Today</p>
-            <p className="text-4xl font-semibold mt-2 text-[#4F46E5]">{pomodoroSessions}</p>
+            <p className="text-4xl font-semibold mt-2 text-[#4F46E5]">
+              {pomodoroSessions}
+            </p>
           </div>
         </div>
 
-        {/* Recent Tasks */}
+        {/* Recent tasks */}
         <div className="bg-white rounded-2xl shadow-md p-5 md:p-6">
           <h2 className="text-2xl font-semibold mb-4">Recent Tasks</h2>
           {tasks.length === 0 ? (
-            <p className="text-slate-500">No tasks yet. Add one from the "+" tab.</p>
+            <p className="text-slate-500">
+              No tasks yet. Add one from the "+" tab.
+            </p>
           ) : (
             <ul className="space-y-3">
               {tasks.slice(0, 5).map((task) => (
@@ -138,7 +170,7 @@ export default function HomePage() {
                 >
                   <span className="text-lg">{task.title}</span>
                   <button
-                    onClick={() => toggleTaskDone(task.id)}
+                    onClick={() => toggleTaskDone(task)}
                     className={`text-sm px-3 py-1 rounded-lg transition-all shadow-sm ${
                       task.completed
                         ? "bg-slate-300 text-white"
@@ -153,7 +185,9 @@ export default function HomePage() {
           )}
 
           {tasks.length > 5 && (
-            <p className="text-[#4F46E5] mt-4 text-sm">View more in the Tasks tab →</p>
+            <p className="text-[#4F46E5] mt-4 text-sm">
+              View more in the Tasks tab →
+            </p>
           )}
         </div>
       </div>
