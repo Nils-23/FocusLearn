@@ -6,6 +6,7 @@ import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 
 
 export default function SettingsPage() {
   const [darkMode, setDarkMode] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
   const [fullName, setFullName] = useState("");
   const [age, setAge] = useState("");
   const [major, setMajor] = useState("");
@@ -17,10 +18,13 @@ export default function SettingsPage() {
 
   const db = getFirestore();
 
-  // Load dark mode and user profile
+  // Load dark mode, focus mode and profile
   useEffect(() => {
-    const stored = localStorage.getItem("darkMode");
-    if (stored === "true") setDarkMode(true);
+    const storedDark = localStorage.getItem("darkMode");
+    if (storedDark === "true") setDarkMode(true);
+
+    const savedFocus = localStorage.getItem("focusMode");
+    if (savedFocus === "true") setFocusMode(true);
 
     const loadUserProfile = async () => {
       const user = auth.currentUser;
@@ -41,7 +45,7 @@ export default function SettingsPage() {
     loadUserProfile();
   }, []);
 
-  // Apply dark mode class
+  // Apply dark mode class and store
   useEffect(() => {
     const html = document.documentElement;
     if (darkMode) html.classList.add("dark");
@@ -50,16 +54,26 @@ export default function SettingsPage() {
     localStorage.setItem("darkMode", darkMode.toString());
   }, [darkMode]);
 
+  // Store focus/lockdown mode & trigger callback
+  useEffect(() => {
+    localStorage.setItem("focusMode", focusMode.toString());
+
+    if (focusMode) {
+      console.log("🔒 Focus Mode ON — notifications should be blocked.");
+      // A real notification-blocking call will go here later
+    } else {
+      console.log("🔓 Focus Mode OFF — notifications allowed.");
+    }
+  }, [focusMode]);
+
   const saveProfile = async () => {
     const user = auth.currentUser;
     if (user) {
-      await setDoc(doc(db, "users", user.uid), {
-        fullName,
-        age,
-        major,
-        primaryGoal,
-        dailyGoal,
-      }, { merge: true });
+      await setDoc(
+        doc(db, "users", user.uid),
+        { fullName, age, major, primaryGoal, dailyGoal },
+        { merge: true }
+      );
       setMessage("Profile updated successfully!");
     }
   };
@@ -91,6 +105,19 @@ export default function SettingsPage() {
           }`}
         >
           {darkMode ? "On" : "Off"}
+        </button>
+      </div>
+
+      {/* Focus / Lockdown Mode */}
+      <div className="flex items-center justify-between mb-6">
+        <span className="text-lg">Focus Mode (Lock Notifications)</span>
+        <button
+          onClick={() => setFocusMode(!focusMode)}
+          className={`px-4 py-2 rounded ${
+            focusMode ? "bg-green-700 text-white" : "bg-gray-300 text-black"
+          }`}
+        >
+          {focusMode ? "Enabled" : "Disabled"}
         </button>
       </div>
 
