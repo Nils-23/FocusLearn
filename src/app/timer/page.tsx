@@ -16,6 +16,7 @@ export default function TimerPage() {
   const [isRunning, setIsRunning] = useState(false);
   const [mode, setMode] = useState<"pomodoro" | "shortBreak" | "longBreak">("pomodoro");
   const [sessions, setSessions] = useState(0);
+  const [focusMode, setFocusMode] = useState(false); // <-- focus mode state
 
   // Firestore document ref for timer
   const timerDocRef = user ? doc(db, "timer", user.uid) : null;
@@ -25,24 +26,23 @@ export default function TimerPage() {
 
   const playSound = () => new Audio("/notification.mp3").play();
 
-  // Load auth and user-specific sessions + timer state
+  // Load auth, sessions, timer state, and focus mode
   useEffect(() => {
     const unsub = watchAuthState(async (u) => {
       setUser(u);
       if (!u) return;
 
-      // Load pomodoro sessions
       const userSessions = await getUserPomodoro(u.uid);
       setSessions(userSessions);
 
-      // Load timer state from Firestore
       const timerSnap = await getDoc(doc(db, "timer", u.uid));
       if (timerSnap.exists()) {
-        const { mode: savedMode, endTime, isRunning: savedRunning } = timerSnap.data() as any;
+        const { mode: savedMode, endTime, isRunning: savedRunning, focusMode: savedFocus } = timerSnap.data() as any;
         const remaining = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
         setMode(savedMode);
         setTimeLeft(remaining > 0 ? remaining : getTotalTime(savedMode));
         setIsRunning(savedRunning && remaining > 0);
+        setFocusMode(savedFocus || false);
       }
     });
     return () => unsub();
@@ -84,7 +84,7 @@ export default function TimerPage() {
     const endTime = Date.now() + timeLeft * 1000;
 
     if (timerDocRef) {
-      await setDoc(timerDocRef, { mode, endTime, isRunning: true }, { merge: true });
+      await setDoc(timerDocRef, { mode, endTime, isRunning: true, focusMode }, { merge: true });
     }
 
     setIsRunning(true);
@@ -93,7 +93,7 @@ export default function TimerPage() {
   const pauseTimer = async () => {
     if (!user || !timerDocRef) return;
     const endTime = Date.now() + timeLeft * 1000;
-    await setDoc(timerDocRef, { mode, endTime, isRunning: false }, { merge: true });
+    await setDoc(timerDocRef, { mode, endTime, isRunning: false, focusMode }, { merge: true });
     setIsRunning(false);
   };
 
@@ -106,8 +106,15 @@ export default function TimerPage() {
     if (!user) return;
     const endTime = Date.now() + newTime * 1000;
     if (timerDocRef) {
-      await setDoc(timerDocRef, { mode: newMode, endTime, isRunning: false }, { merge: true });
+      await setDoc(timerDocRef, { mode: newMode, endTime, isRunning: false, focusMode }, { merge: true });
     }
+  };
+
+  // Toggle focus mode
+  const toggleFocusMode = async () => {
+    setFocusMode(prev => !prev);
+    if (!user || !timerDocRef) return;
+    await updateDoc(timerDocRef, { focusMode: !focusMode });
   };
 
   const formatTime = (seconds: number) => {
@@ -128,6 +135,19 @@ export default function TimerPage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-8">
       <h1 className="text-3xl font-bold mb-6">Pomodoro Timer</h1>
+
+      {/* Focus Mode Toggle */}
+      <div className="mb-6 flex items-center justify-between w-64">
+        <span className="text-lg font-medium">Focus Mode</span>
+        <button
+          onClick={toggleFocusMode}
+          className={`px-4 py-2 rounded ${
+            focusMode ? "bg-green-600 text-white" : "bg-gray-300 text-black"
+          }`}
+        >
+          {focusMode ? "On" : "Off"}
+        </button>
+      </div>
 
       <div className="mb-6 bg-white rounded-xl shadow-sm border p-1 flex overflow-hidden">
         {[
