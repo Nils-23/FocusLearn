@@ -1,0 +1,4 @@
+This is a test file about Photosynthesis.
+Photosynthesis is the process by which green plants and some other organisms use sunlight to synthesize foods with the aid of chlorophyll.
+Photosynthesis in plants generally involves the green pigment chlorophyll and generates oxygen as a byproduct.
+The equation for photosynthesis is: 6CO2 + 6H2O + Light Energy -> C6H12O6 + 6O2.

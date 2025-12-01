@@ -13,6 +13,7 @@ export async function POST(request: Request) {
   const newTask: Task = {
     id: uuidv4(),
     title: String(body.title || ""),
+    description: body.description ? String(body.description) : undefined,
     completed: false,
     dueDate: body.dueDate ? String(body.dueDate) : undefined,
   };

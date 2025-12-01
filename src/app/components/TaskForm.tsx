@@ -9,11 +9,11 @@ type Props = {
 
 export default function TaskForm({ onCreate }: Props) {
   const [title, setTitle] = useState("");
-  const [notes, setNotes] = useState("");
+  const [description, setDescription] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const payload = { title, notes };
+    const payload = { title, description };
     // call backend to create task
     const res = await fetch("/api/tasks", {
       method: "POST",
@@ -28,7 +28,7 @@ export default function TaskForm({ onCreate }: Props) {
     const created: Task = await res.json();
     onCreate(created);
     setTitle("");
-    setNotes("");
+    setDescription("");
   }
 
   return (
@@ -41,9 +41,9 @@ export default function TaskForm({ onCreate }: Props) {
         required
       />
       <textarea
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        placeholder="Optional notes"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="Optional description"
         className="w-full p-2 border rounded"
         rows={3}
       />

@@ -26,6 +26,8 @@ export default function TaskList() {
       {tasks.map((t) => (
         <li key={t.id} className="p-3 border rounded flex justify-between items-start">
           <div>
+            <p className="font-medium">{t.title}</p>
+            {t.description && <p className="text-sm text-gray-500">{t.description}</p>}
           </div>
           <div>
             <input type="checkbox" checked={t.completed} readOnly />
